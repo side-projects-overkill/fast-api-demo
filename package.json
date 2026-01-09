@@ -1,0 +1,30 @@
+{
+  "name": "nodejs-performance-patterns",
+  "version": "1.0.0",
+  "description": "Examples demonstrating Node.js performance patterns: Event Loop, Worker Threads, Native Modules, and WASM",
+  "type": "module",
+  "scripts": {
+    "example:blocked": "node examples/01-event-loop-paradox/blocked-event-loop.js",
+    "example:async-io": "node examples/01-event-loop-paradox/async-io-strength.js",
+    "example:workers-basic": "node examples/02-worker-threads/basic-worker.js",
+    "example:workers-pool": "node examples/02-worker-threads/worker-pool.js",
+    "example:workers-fibonacci": "node examples/02-worker-threads/fibonacci-comparison.js",
+    "example:native-concept": "node examples/03-native-modules/native-concept.js",
+    "example:native-simulation": "node examples/03-native-modules/native-simulation.js",
+    "example:wasm-vs-native": "node examples/04-ecosystem/wasm-vs-native.js",
+    "example:ecosystem-overview": "node examples/04-ecosystem/ecosystem-overview.js",
+    "example:comparison": "node examples/05-comparison-matrix/comparison.js",
+    "example:architecture": "node examples/06-ultimate-architecture/architecture-demo.js",
+    "all": "npm run example:blocked && npm run example:async-io && npm run example:workers-basic"
+  },
+  "keywords": [
+    "nodejs",
+    "worker-threads",
+    "native-modules",
+    "webassembly",
+    "performance"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
