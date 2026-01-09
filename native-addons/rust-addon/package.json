@@ -1,0 +1,23 @@
+{
+  "name": "rust-prime-counter",
+  "version": "1.0.0",
+  "description": "High-performance prime counter native addon written in Rust",
+  "main": "index.js",
+  "scripts": {
+    "build": "napi build --release",
+    "build:debug": "napi build",
+    "test": "node test.js"
+  },
+  "napi": {
+    "name": "rust-prime-counter",
+    "triples": {
+      "defaults": true
+    }
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0"
+  },
+  "keywords": ["napi-rs", "rust", "native", "performance"],
+  "license": "MIT"
+}
+

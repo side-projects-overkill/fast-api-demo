@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.node
+target/
+
+# Rust build artifacts
+native-addons/rust-addon/target/
+native-addons/rust-addon/*.node
+
+# C++ build artifacts
+native-addons/cpp-addon/build/
+
+# Test files created by demos
+test-file.txt
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.npm/
+

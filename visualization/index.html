@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node.js Performance Paradox - Interactive Guide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1e293b;
+            --accent-cyan: #22d3ee;
+            --accent-orange: #fb923c;
+            --accent-pink: #f472b6;
+            --accent-green: #4ade80;
+            --accent-red: #f87171;
+            --accent-purple: #a78bfa;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(255,255,255,0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 20% 40%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse 60% 40% at 80% 60%, rgba(251, 146, 60, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse 50% 60% at 50% 90%, rgba(167, 139, 250, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 4rem 2rem;
+            position: relative;
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-orange) 50%, var(--accent-pink) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+
+        /* Section styling */
+        section {
+            margin-bottom: 4rem;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-weight: 600;
+        }
+
+        h2 .icon {
+            font-size: 1.5rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-orange));
+        }
+
+        /* Event Loop Visualization */
+        .event-loop-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .event-loop-container { grid-template-columns: 1fr; }
+        }
+
+        .event-loop-demo {
+            padding: 2rem;
+            border-radius: 1rem;
+            background: var(--bg-tertiary);
+            position: relative;
+        }
+
+        .event-loop-demo.healthy { border: 2px solid var(--accent-green); }
+        .event-loop-demo.blocked { border: 2px solid var(--accent-red); }
+
+        .demo-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .demo-title.healthy { color: var(--accent-green); }
+        .demo-title.blocked { color: var(--accent-red); }
+
+        /* Event loop animation */
+        .loop-track {
+            height: 60px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 30px;
+            position: relative;
+            margin: 1.5rem 0;
+            overflow: hidden;
+        }
+
+        .loop-indicator {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            top: 5px;
+            animation: loopCycle 2s infinite linear;
+            box-shadow: 0 0 20px var(--accent-cyan);
+        }
+
+        .blocked .loop-indicator {
+            animation: loopBlocked 2s infinite;
+            background: var(--accent-red);
+            box-shadow: 0 0 20px var(--accent-red);
+        }
+
+        @keyframes loopCycle {
+            0% { left: 5px; }
+            100% { left: calc(100% - 55px); }
+        }
+
+        @keyframes loopBlocked {
+            0%, 100% { left: 30%; transform: scale(1); }
+            50% { left: 30%; transform: scale(1.1); }
+        }
+
+        .status-text {
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* Timeline bars */
+        .timeline {
+            margin-top: 1rem;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .timeline-bar {
+            height: 12px;
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        .healthy .timeline-bar {
+            background: var(--accent-green);
+            width: 30px;
+        }
+
+        .blocked .timeline-bar {
+            background: var(--accent-red);
+            width: 100%;
+        }
+
+        /* Architecture Diagram */
+        .architecture {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .arch-layer {
+            width: 100%;
+            max-width: 800px;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            text-align: center;
+            position: relative;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .arch-layer:hover {
+            transform: scale(1.02);
+        }
+
+        .arch-layer.main-thread {
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(34, 211, 238, 0.05));
+            border: 2px solid var(--accent-cyan);
+        }
+
+        .arch-layer.worker-pool {
+            background: linear-gradient(135deg, rgba(251, 146, 60, 0.2), rgba(251, 146, 60, 0.05));
+            border: 2px solid var(--accent-orange);
+        }
+
+        .arch-layer.native-core {
+            background: linear-gradient(135deg, rgba(167, 139, 250, 0.2), rgba(167, 139, 250, 0.05));
+            border: 2px solid var(--accent-purple);
+        }
+
+        .arch-layer h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .arch-layer p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .arch-arrow {
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(5px); }
+        }
+
+        .worker-grid {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .worker-box {
+            width: 80px;
+            height: 80px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .worker-box.active {
+            border-color: var(--accent-orange);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(251, 146, 60, 0); }
+        }
+
+        /* Comparison Matrix */
+        .matrix-container {
+            overflow-x: auto;
+        }
+
+        .comparison-matrix {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        .comparison-matrix th {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .comparison-matrix th:first-child {
+            border-radius: 0.5rem 0 0 0;
+        }
+
+        .comparison-matrix th:last-child {
+            border-radius: 0 0.5rem 0 0;
+        }
+
+        .comparison-matrix td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .comparison-matrix tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .criteria-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Progress bars in matrix */
+        .score-bar {
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.8s ease;
+        }
+
+        .score-fill.native { background: var(--accent-cyan); }
+        .score-fill.wasm { background: var(--accent-orange); }
+
+        /* Solutions Grid */
+        .solutions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .solution-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .solution-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-cyan);
+        }
+
+        .solution-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .solution-card .tag {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 1rem;
+            font-weight: 600;
+        }
+
+        .tag.native {
+            background: rgba(34, 211, 238, 0.2);
+            color: var(--accent-cyan);
+        }
+
+        .tag.wasm {
+            background: rgba(251, 146, 60, 0.2);
+            color: var(--accent-orange);
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: rgba(0,0,0,0.4);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+
+        .code-block .keyword { color: var(--accent-pink); }
+        .code-block .function { color: var(--accent-cyan); }
+        .code-block .string { color: var(--accent-green); }
+        .code-block .comment { color: var(--text-muted); }
+
+        /* Decision Guide */
+        .decision-guide {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 800px) {
+            .decision-guide { grid-template-columns: 1fr; }
+        }
+
+        .decision-card {
+            padding: 1.5rem;
+            border-radius: 1rem;
+        }
+
+        .decision-card.native-choice {
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), transparent);
+            border: 1px solid rgba(34, 211, 238, 0.3);
+        }
+
+        .decision-card.wasm-choice {
+            background: linear-gradient(135deg, rgba(251, 146, 60, 0.1), transparent);
+            border: 1px solid rgba(251, 146, 60, 0.3);
+        }
+
+        .decision-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .decision-card ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .decision-card li {
+            padding: 0.5rem 0;
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+
+        .decision-card li::before {
+            content: '✓';
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>The Node.js Paradox</h1>
+            <p class="subtitle">Understanding I/O Strength vs CPU Weakness — and How to Solve It</p>
+        </header>
+
+        <!-- Section 1: The Paradox -->
+        <section id="paradox">
+            <h2><span class="icon">⚡</span> The Paradox Explained</h2>
+            <div class="card">
+                <p style="font-size: 1.1rem; margin-bottom: 1.5rem; color: var(--text-secondary);">
+                    Node.js runs on a <strong style="color: var(--accent-cyan);">single-threaded event loop</strong>. 
+                    This is brilliant for I/O (network, disk, database) but catastrophic for CPU-bound tasks.
+                </p>
+                
+                <div class="event-loop-container">
+                    <div class="event-loop-demo healthy">
+                        <div class="demo-title healthy">✅ Healthy Event Loop (I/O Bound)</div>
+                        <div class="loop-track">
+                            <div class="loop-indicator"></div>
+                        </div>
+                        <p class="status-text">Event loop cycling freely • Requests processed instantly</p>
+                        <div class="timeline">
+                            <div class="timeline-item"><span style="width: 60px;">req 1</span> <div class="timeline-bar"></div> 2ms</div>
+                            <div class="timeline-item"><span style="width: 60px;">req 2</span> <div class="timeline-bar"></div> 1ms</div>
+                            <div class="timeline-item"><span style="width: 60px;">req 3</span> <div class="timeline-bar"></div> 2ms</div>
+                            <div class="timeline-item"><span style="width: 60px;">req 4</span> <div class="timeline-bar"></div> 1ms</div>
+                        </div>
+                    </div>
+                    
+                    <div class="event-loop-demo blocked">
+                        <div class="demo-title blocked">❌ Blocked Event Loop (CPU Bound)</div>
+                        <div class="loop-track">
+                            <div class="loop-indicator"></div>
+                        </div>
+                        <p class="status-text">Event loop STUCK • All requests waiting...</p>
+                        <div class="timeline">
+                            <div class="timeline-item"><span style="width: 60px;">req 1</span> <div class="timeline-bar"></div> 2000ms</div>
+                            <div class="timeline-item"><span style="width: 60px;">req 2</span> <div class="timeline-bar"></div> 2000ms</div>
+                            <div class="timeline-item"><span style="width: 60px;">req 3</span> <div class="timeline-bar"></div> 2000ms</div>
+                            <div class="timeline-item"><span style="width: 60px;">req 4</span> <div class="timeline-bar"></div> 2000ms</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Solutions -->
+        <section id="solutions">
+            <h2><span class="icon">🔧</span> The Solutions</h2>
+            <div class="solutions-grid">
+                <div class="solution-card">
+                    <h3>🧵 Solution A: Worker Threads</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        Offload CPU tasks to parallel JavaScript threads, keeping the main loop free.
+                    </p>
+                    <div class="code-block">
+                        <span class="keyword">import</span> { Worker } <span class="keyword">from</span> <span class="string">'worker_threads'</span>;<br><br>
+                        <span class="keyword">const</span> worker = <span class="keyword">new</span> <span class="function">Worker</span>(<span class="string">'./cpu-task.js'</span>);<br>
+                        worker.<span class="function">postMessage</span>({ data: heavyData });<br>
+                        worker.<span class="function">on</span>(<span class="string">'message'</span>, result => {<br>
+                        &nbsp;&nbsp;<span class="comment">// Main thread stayed responsive!</span><br>
+                        });
+                    </div>
+                </div>
+
+                <div class="solution-card">
+                    <h3>🦀 Solution B: Native Modules</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        Replace slow JavaScript with blazing-fast Rust or C++ compiled code.
+                    </p>
+                    <div class="code-block">
+                        <span class="comment">// Using sharp (native C++ image processing)</span><br>
+                        <span class="keyword">import</span> sharp <span class="keyword">from</span> <span class="string">'sharp'</span>;<br><br>
+                        <span class="keyword">await</span> <span class="function">sharp</span>(<span class="string">'photo.jpg'</span>)<br>
+                        &nbsp;&nbsp;.<span class="function">resize</span>(800, 600)<br>
+                        &nbsp;&nbsp;.<span class="function">webp</span>({ quality: 85 })<br>
+                        &nbsp;&nbsp;.<span class="function">toFile</span>(<span class="string">'output.webp'</span>);<br>
+                        <span class="comment">// 50x faster than pure JS!</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Ecosystem -->
+        <section id="ecosystem">
+            <h2><span class="icon">📦</span> The Ecosystem: Native vs WASM</h2>
+            <div class="solutions-grid">
+                <div class="solution-card">
+                    <h3>Native Addons <span class="tag native">MAX SPEED</span></h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        Direct OS access, maximum performance, platform-specific binaries.
+                    </p>
+                    <ul style="list-style: none; padding: 0; color: var(--text-secondary); font-size: 0.9rem;">
+                        <li style="padding: 0.3rem 0;">📸 <strong>sharp</strong> — Image processing</li>
+                        <li style="padding: 0.3rem 0;">🔐 <strong>bcrypt</strong> — Password hashing</li>
+                        <li style="padding: 0.3rem 0;">🗄️ <strong>better-sqlite3</strong> — SQLite database</li>
+                        <li style="padding: 0.3rem 0;">🖥️ <strong>node-canvas</strong> — 2D graphics</li>
+                    </ul>
+                </div>
+
+                <div class="solution-card">
+                    <h3>WebAssembly <span class="tag wasm">PORTABLE</span></h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                        Sandboxed, cross-platform, same code works in browser & Node.js.
+                    </p>
+                    <ul style="list-style: none; padding: 0; color: var(--text-secondary); font-size: 0.9rem;">
+                        <li style="padding: 0.3rem 0;">🎬 <strong>@ffmpeg/ffmpeg</strong> — Video processing</li>
+                        <li style="padding: 0.3rem 0;">📊 <strong>@duckdb/duckdb-wasm</strong> — Analytics DB</li>
+                        <li style="padding: 0.3rem 0;">⚡ <strong>esbuild-wasm</strong> — JS bundler</li>
+                        <li style="padding: 0.3rem 0;">🔐 <strong>argon2-browser</strong> — Password hashing</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Comparison Matrix -->
+        <section id="comparison">
+            <h2><span class="icon">📊</span> Comparison Matrix</h2>
+            <div class="card">
+                <div class="matrix-container">
+                    <table class="comparison-matrix">
+                        <thead>
+                            <tr>
+                                <th>Criteria</th>
+                                <th>Native Addons</th>
+                                <th>WebAssembly</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="criteria-name">⚡ Performance</span></td>
+                                <td>
+                                    <strong>Maximum</strong> — Direct hardware access, SIMD, no overhead
+                                    <div class="score-bar"><div class="score-fill native" style="width: 100%;"></div></div>
+                                </td>
+                                <td>
+                                    <strong>Near-native</strong> — WASM runtime adds ~10-30% overhead
+                                    <div class="score-bar"><div class="score-fill wasm" style="width: 75%;"></div></div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><span class="criteria-name">🌍 Portability</span></td>
+                                <td>
+                                    <strong>Per-platform builds</strong> — x64, arm64, each OS needs binary
+                                    <div class="score-bar"><div class="score-fill native" style="width: 35%;"></div></div>
+                                </td>
+                                <td>
+                                    <strong>Universal</strong> — Same .wasm file works everywhere
+                                    <div class="score-bar"><div class="score-fill wasm" style="width: 100%;"></div></div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><span class="criteria-name">🔒 Safety</span></td>
+                                <td>
+                                    <strong>Full access</strong> — Can crash process, access any memory
+                                    <div class="score-bar"><div class="score-fill native" style="width: 50%;"></div></div>
+                                </td>
+                                <td>
+                                    <strong>Sandboxed</strong> — Memory-safe, isolated execution
+                                    <div class="score-bar"><div class="score-fill wasm" style="width: 100%;"></div></div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><span class="criteria-name">🔧 OS Access</span></td>
+                                <td>
+                                    <strong>Full</strong> — Files, network, processes, hardware
+                                    <div class="score-bar"><div class="score-fill native" style="width: 100%;"></div></div>
+                                </td>
+                                <td>
+                                    <strong>Limited</strong> — WASI provides basic I/O only
+                                    <div class="score-bar"><div class="score-fill wasm" style="width: 20%;"></div></div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><span class="criteria-name">🌐 Browser Support</span></td>
+                                <td>
+                                    <strong>None</strong> — Node.js only
+                                    <div class="score-bar"><div class="score-fill native" style="width: 0%;"></div></div>
+                                </td>
+                                <td>
+                                    <strong>Full</strong> — Same code in browser & Node.js
+                                    <div class="score-bar"><div class="score-fill wasm" style="width: 100%;"></div></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Decision Guide -->
+        <section id="decision">
+            <h2><span class="icon">🎯</span> Which Should You Choose?</h2>
+            <div class="decision-guide">
+                <div class="decision-card native-choice">
+                    <h3 style="color: var(--accent-cyan);">Choose Native Addons When:</h3>
+                    <ul>
+                        <li>Maximum performance is critical</li>
+                        <li>You need OS-level access (filesystem, hardware)</li>
+                        <li>Using existing C/C++ libraries</li>
+                        <li>Server-only deployment</li>
+                        <li>Platform-specific features needed</li>
+                    </ul>
+                </div>
+                <div class="decision-card wasm-choice">
+                    <h3 style="color: var(--accent-orange);">Choose WebAssembly When:</h3>
+                    <ul>
+                        <li>Code must run in browser AND Node.js</li>
+                        <li>Easy distribution without platform builds</li>
+                        <li>Security/sandboxing is important</li>
+                        <li>Library is already available as WASM</li>
+                        <li>Near-native speed is acceptable</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 6: Ultimate Architecture -->
+        <section id="architecture">
+            <h2><span class="icon">🏗️</span> The Ultimate Architecture</h2>
+            <div class="card">
+                <div class="architecture">
+                    <div class="arch-layer main-thread">
+                        <h3>🌐 Main Thread (Event Loop)</h3>
+                        <p>HTTP routing, WebSocket management, response streaming</p>
+                        <p style="color: var(--accent-cyan); margin-top: 0.5rem; font-weight: 600;">⚡ MUST STAY LIGHTWEIGHT — No CPU work here!</p>
+                    </div>
+                    
+                    <div class="arch-arrow">▼</div>
+                    
+                    <div class="arch-layer worker-pool">
+                        <h3>🧵 Worker Pool</h3>
+                        <p>Parallel execution, load balancing, task queue management</p>
+                        <div class="worker-grid">
+                            <div class="worker-box active">Worker 1<br>🔄</div>
+                            <div class="worker-box active">Worker 2<br>🔄</div>
+                            <div class="worker-box">Worker 3<br>💤</div>
+                            <div class="worker-box active">Worker N<br>🔄</div>
+                        </div>
+                    </div>
+                    
+                    <div class="arch-arrow">▼</div>
+                    
+                    <div class="arch-layer native-core">
+                        <h3>🦀 Native Core</h3>
+                        <p>Maximum performance: sharp, bcrypt, better-sqlite3, or custom Rust/C++ modules</p>
+                        <p style="color: var(--accent-purple); margin-top: 0.5rem; font-weight: 600;">🚀 10-100x faster than JavaScript</p>
+                    </div>
+                </div>
+
+                <div class="code-block" style="margin-top: 2rem;">
+                    <span class="comment">// The Ultimate Pattern: Express + Piscina + Sharp</span><br><br>
+                    <span class="keyword">import</span> express <span class="keyword">from</span> <span class="string">'express'</span>;<br>
+                    <span class="keyword">import</span> Piscina <span class="keyword">from</span> <span class="string">'piscina'</span>;<br><br>
+                    <span class="keyword">const</span> pool = <span class="keyword">new</span> <span class="function">Piscina</span>({ filename: <span class="string">'./worker.mjs'</span> });<br><br>
+                    app.<span class="function">post</span>(<span class="string">'/images/resize'</span>, <span class="keyword">async</span> (req, res) => {<br>
+                    &nbsp;&nbsp;<span class="comment">// Main thread: just routing</span><br>
+                    &nbsp;&nbsp;<span class="keyword">const</span> result = <span class="keyword">await</span> pool.<span class="function">run</span>({ task: <span class="string">'resize'</span>, data: req.body });<br>
+                    &nbsp;&nbsp;res.<span class="function">send</span>(result); <span class="comment">// Event loop stayed free!</span><br>
+                    });
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Run the examples: <code style="background: var(--bg-tertiary); padding: 0.2rem 0.5rem; border-radius: 0.25rem;">npm run demo:blocking</code></p>
+            <p style="margin-top: 1rem;">Built with Node.js • <a href="https://nodejs.org/api/worker_threads.html">Worker Threads Docs</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Add intersection observer for scroll animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationPlayState = 'running';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('section').forEach(section => {
+            observer.observe(section);
+        });
+    </script>
+</body>
+</html>
+
